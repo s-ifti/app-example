@@ -8,6 +8,10 @@ Parameters:
     Type: String
     Default: 1.6.2
     AllowedPattern: \d\.\d\.\d
+  AppGithubAccount:
+    Description: GitHub account name
+    Type: String
+    Default: my-github-account
   SourceRepo:
     Description: Source Code repository name
     Type: String
@@ -118,7 +122,7 @@ Resources:
             flink = urllib2.urlopen('https://github.com/apache/flink/archive/release-${FlinkVersion}.zip')
             s3.put_object(Bucket='${ArtifactBucket}',Key='sources/flink-src.zip',Body=flink.read())
 
-            runtime_artifacts = urllib2.urlopen('https://github.com/s-ifti/${SourceRepo}/archive/${SourceBranch}.zip')
+            runtime_artifacts = urllib2.urlopen('https://github.com/${AppGithubAccount}/${SourceRepo}/archive/${SourceBranch}.zip')
             s3.put_object(Bucket='${ArtifactBucket}',Key='sources/kinesis-analytics-app-example.zip',Body=runtime_artifacts.read())
 
             cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
