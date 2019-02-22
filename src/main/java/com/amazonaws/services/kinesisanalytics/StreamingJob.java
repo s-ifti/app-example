@@ -154,7 +154,7 @@ public class StreamingJob {
                 .aggregate(new StatsAggregate(), new MyProcessWindowFunction())
                 .name("stats_30Sec")
                 .map(stats -> {
-                    LOG.info("APP {}, Stats {} ", stats.f0, stats.f1.toString());
+                    LOG.info("APP {}, {} ", stats.f0, stats.f1.toString());
                     return stats;
                 }).returns(TypeInformation.of(new TypeHint<Tuple2<String, Stats>>() {
                 }))
