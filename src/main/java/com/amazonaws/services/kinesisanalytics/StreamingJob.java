@@ -143,7 +143,7 @@ public class StreamingJob {
                                     return new Tuple2<>(appEvent.getAppName(), appEvent);
                                 }
                         ).returns(TypeInformation.of(new TypeHint<Tuple2<String, AppModel>>() {
-                }))
+                        }))
                         .name("map_AppName_Version_Tuple");
 
         DataStream<Tuple2<String, Stats>> statsOutput = sampleApp
@@ -156,7 +156,9 @@ public class StreamingJob {
                 .map(stats -> {
                     LOG.info("APP {}, Stats {} ", stats.f0, stats.f1.toString());
                     return stats;
-                }).name("map_logToCW");
+                }).returns(TypeInformation.of(new TypeHint<Tuple2<String, Stats>>() {
+                }))
+                .name("map_logToCW");
 
 
         statsOutput.print()
