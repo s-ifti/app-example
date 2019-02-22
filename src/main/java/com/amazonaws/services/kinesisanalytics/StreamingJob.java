@@ -52,6 +52,7 @@ import org.apache.flink.streaming.api.TimeCharacteristic;
  */
 public class StreamingJob {
 
+    private static final long TIME_WINDOW_IN_SECONDS = 60L;
     private static Logger LOG = LoggerFactory.getLogger(StreamingJob.class);
 
     private static String VERSION = "1.0.5";
@@ -149,10 +150,10 @@ public class StreamingJob {
         DataStream<Tuple2<String, Stats>> statsOutput = sampleApp
                 //partition by app name (e.g. facebook, googledeadplus, chime, etc....)
                 .keyBy(x -> x.f0)
-                .timeWindow(org.apache.flink.streaming.api.windowing.time.Time.seconds(30))
-                //calc stats for last 30 seconds window
+                .timeWindow(org.apache.flink.streaming.api.windowing.time.Time.seconds(TIME_WINDOW_IN_SECONDS))
+                //calc stats for last time window
                 .aggregate(new StatsAggregate(), new MyProcessWindowFunction())
-                .name("stats_30Sec")
+                .name("stats_TimeWindow")
                 .map(stats -> {
                     LOG.info("APP {}, {} ", stats.f0, stats.f1.toString());
                     return stats;
@@ -209,7 +210,8 @@ public class StreamingJob {
             implements AggregateFunction<Tuple2<String, AppModel>, Stats, Stats> {
         @Override
         public Stats createAccumulator() {
-            return new Stats(0.0, 0.0, 0.0, 0.0);
+            //start accumulator
+            return new Stats( /* min start */ Double.MAX_VALUE, /* max start */ Double.MIN_VALUE, 0.0, 0.0);
         }
 
         @Override

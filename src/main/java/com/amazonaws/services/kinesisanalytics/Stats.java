@@ -18,7 +18,7 @@ public class Stats {
         if (count > 0) {
             this.setAvg(sum / count);
         } else {
-            // this should be NaN, but starting with 0
+            // this should be NaN, right now for sample code using 0
             this.setAvg(0.0);
         }
 
@@ -64,7 +64,13 @@ public class Stats {
 
 
     public String toString() {
-        return "STATS: min: " + min + " max: " + max + " avg: " + avg + " count: " + count;
+
+        if( this.count>0 ) {
+            return "STATS: min: " + min + " max: " + max + " count: " + count + " avg: " + avg ;
+        }
+        else {
+            return "STATS: empty";
+        }
     }
 
     public Double getSum() {
