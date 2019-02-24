@@ -153,6 +153,7 @@ Resources:
               streamName = '${InputKinesisStream}'
               print('input stream: ' + streamName)
               startTime = datetime.utcnow()
+              # simulat apps
               apps = ['snapchat', 'facebook', 'googledeadplus', 'chime', 'pong']
 
               for i in range(2000):
@@ -161,9 +162,10 @@ Resources:
                     print("TIME UP")
                     break
                 timeString = evtTime.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                appId = "\"" + str(uuid.uuid4()) + "\""
+                appId = str(uuid.uuid4())
                 appVersion = 50 + random.randint(-20,30)
-                #send csv
+                #send csv format
+                #  appName, timestamp, appId, version
                 message =apps[random.randint(0,len(apps)-1)] + ", " + timeString + "," + appId + "," + str(appVersion) + ""
                 
                 

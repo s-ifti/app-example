@@ -11,16 +11,18 @@ import java.util.Date;
 
 public class CsvToAppModelStream {
     private static final int CSV_APP_NAME_COL_INDEX = 0;
-    private static final int CSV_APP_ID_COL_INDEX = 2;
     private static final int CSV_TIMESTAMP_COL_INDEX = 1;
+    private static final int CSV_APP_ID_COL_INDEX = 2;
     private static final int CSV_VERSION_COL_INDEX = 3;
 
     private static Logger LOG = LoggerFactory.getLogger(CsvToAppModelStream.class);
 
     /**
-     * convert raw CSV to DataStream<AppModel> then use it as a table.
+     * convert raw CSV to DataStream<AppModel>.
+     * csv input format is assumed as:
+     *    appName, timestamp, appId, version
      * @param inputCsvStream input csv stream
-     * @return
+     * @return DataStream instance for AppModel
      */
     public static DataStream<AppModel> convert(DataStream<String> inputCsvStream){
         return inputCsvStream.map(csvRow -> {
@@ -40,6 +42,9 @@ public class CsvToAppModelStream {
                     try {
                         version = Integer.parseInt(csvFields[CSV_VERSION_COL_INDEX]);
                     } catch (Exception e) {
+                        LOG.error("Error processing version attribute " + e.toString());
+
+                        //
                     }
 
                     return new AppModel(

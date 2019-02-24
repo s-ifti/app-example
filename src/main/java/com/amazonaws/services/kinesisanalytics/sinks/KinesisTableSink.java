@@ -2,7 +2,6 @@ package com.amazonaws.services.kinesisanalytics.sinks;
 
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.kinesis.shaded.com.amazonaws.services.kinesis.producer.KinesisProducer;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.connectors.kinesis.FlinkKinesisProducer;
 import org.apache.flink.table.sinks.AppendStreamTableSink;
@@ -24,7 +23,7 @@ public class KinesisTableSink implements AppendStreamTableSink<Row> {
         this.kinesisProducerSink = sink;
     }
 
-    public KinesisTableSink(String[] fieldNames,
+    private KinesisTableSink(String[] fieldNames,
                             TypeInformation<?>[] fieldTypes,
                             FlinkKinesisProducer<String> sink) {
         this.fieldNames = fieldNames;
@@ -34,11 +33,11 @@ public class KinesisTableSink implements AppendStreamTableSink<Row> {
 
     @Override
     public void emitDataStream(DataStream<Row> dataStream) {
-        /**
-         * convert row to csv string before adding sink to it
-         * note: default Row toString returns a simple csv formatted string
-         * the value is not using full csv standard
-         * if dataset requires escaping use a csv formatter
+        /*
+          convert row to csv string before adding sink to it
+          note: default Row toString returns a simple csv formatted string
+          the value is not using full csv standard
+          if dataset requires escaping use a csv formatter
          */
         dataStream.map(row -> row.toString()).addSink(this.kinesisProducerSink);
     }

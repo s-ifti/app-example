@@ -1,6 +1,7 @@
 /*
  * Flink App Example
  * The app reads stream of app events and check min max and count of events reported
+ *
  */
 
 package com.amazonaws.services.kinesisanalytics;
@@ -92,7 +93,7 @@ public class StreamingJob {
 
         // Add kinesis source
         // Notes: input data stream is a csv formatted string of following format
-        //      | appName, timestamp, appId, version |
+        //          appName, timestamp, appId, version
         DataStream<String> inputStream = getInputDataStream(env, inputStreamName, region);
 
         // Add kinesis output
@@ -174,7 +175,7 @@ public class StreamingJob {
     }
 
     // helper method to return runtime properties for Property Group AppProperties
-    public static Properties initRuntimeConfigProperties() {
+    private static Properties initRuntimeConfigProperties() {
         try {
             Map<String, Properties> runConfigurations = KinesisAnalyticsRuntime.getApplicationProperties();
             return runConfigurations.get("AppProperties");

@@ -20,10 +20,10 @@ public class Log4jTableSink implements AppendStreamTableSink<Row> {
 
 
     public Log4jTableSink(String logHeader) {
-
+        this.logHeader = logHeader;
     }
 
-    public Log4jTableSink(String logHeader, String[] fieldNames, TypeInformation<?>[] fieldTypes, Log4jSink<Row> sink) {
+    private Log4jTableSink(String logHeader, String[] fieldNames, TypeInformation<?>[] fieldTypes, Log4jSink<Row> sink) {
         this.logHeader = logHeader;
         this.fieldNames = fieldNames;
         this.fieldTypes = fieldTypes;
