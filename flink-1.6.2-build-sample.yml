@@ -410,15 +410,15 @@ Resources:
                   - s3:ListBucket
 
   InputKinesisStream:
-    Name: !Sub Input-${AWS::StackName}
     Type: AWS::Kinesis::Stream
     Properties:
+      Name: !Sub Input-${AWS::StackName}
       ShardCount: !Sub ${Parallelism}
 
   OutputKinesisStream:
-    Name: !Sub Output-${AWS::StackName}
     Type: AWS::Kinesis::Stream
     Properties:
+      Name: !Sub Output-${AWS::StackName}
       ShardCount: !Sub ${Parallelism}
 
   LambdaExecutionRole:
