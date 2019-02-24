@@ -98,9 +98,9 @@ public class StreamingJob {
         StreamTableEnvironment tableEnv = TableEnvironment.getTableEnvironment(env);
         DataStream<AppModel> inputAppModelStream = CsvToAppModelStream.convert(inputStream);
 
-        Table table = tableEnv.fromDataStream(inputAppModelStream);
+        Table table = tableEnv.fromDataStream(inputAppModelStream, "appName,timestamp,appId,version,timestamp.rowtime");
         Table output = table
-                .window(Tumble.over("1.minutes").on("timestamp").as("w"))
+                .window(Tumble.over("1.minutes").on("rowtime").as("w"))
                 .groupBy("w, appName")
                 .select("appName, w.start, w.end, version.min as minVersion, version.max as maxVersion, version.count as versionCount ");
         output.writeToSink(new Log4jTableSink<Row>());
