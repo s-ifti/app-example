@@ -25,21 +25,25 @@ import org.slf4j.LoggerFactory;
 
 /**
  * A log4j logging sink (note that this is a simple sink where checkpoint is not relevant),
- * this is similar to print() instead of console output it write logs to log4j, which
- * depending on backend can also be sent to cloudwatch
+ * This helps in debugging flink streams, and is similar to print(), where instead of writing to console it write stream data
+ * to log4j.
  */
 public class Log4jSink<T> extends RichSinkFunction<T> implements CheckpointedFunction {
     private static Logger LOG = LoggerFactory.getLogger(Log4jSink.class);
 
+    private String logHeader;
 
-    public Log4jSink() {
-
+    public Log4jSink(String logHeader) {
+        this.logHeader = logHeader;
     }
 
     @Override
     public void invoke(T document)  {
         if(document != null) {
-            LOG.info("Log4jSink: " + document.toString());
+            LOG.info(logHeader +": " + document.toString());
+        }
+        else {
+            LOG.info(logHeader + ": null");
         }
     }
 
@@ -51,12 +55,12 @@ public class Log4jSink<T> extends RichSinkFunction<T> implements CheckpointedFun
 
     @Override
     public void snapshotState(FunctionSnapshotContext functionSnapshotContext) throws Exception {
-        //nothing to do for state
+        //not needed for this sink
     }
 
     @Override
     public void initializeState(FunctionInitializationContext functionInitializationContext) throws Exception {
-        //nothing to do for state
+        //not needed for this sink
     }
 
 

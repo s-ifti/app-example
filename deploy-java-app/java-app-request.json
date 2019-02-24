@@ -38,6 +38,7 @@
           "PropertyGroupId": "AppProperties",
           "PropertyMap": {
             "inputStreamName": "#{INPUT_STREAM}",
+            "outputStreamName": "#{OUTPUT_STREAM}",
             "metricTag": "#{APP_NAME}",
             "region" : "#{TEST_REGION}",
             "parallelism" : "#{PARALLELISM}"

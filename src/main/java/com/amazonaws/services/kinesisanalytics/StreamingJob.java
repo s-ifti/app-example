@@ -7,12 +7,15 @@ package com.amazonaws.services.kinesisanalytics;
 
 import com.amazonaws.services.kinesisanalytics.converters.CsvToAppModelStream;
 import com.amazonaws.services.kinesisanalytics.runtime.KinesisAnalyticsRuntime;
+import com.amazonaws.services.kinesisanalytics.sinks.KinesisTableSink;
 import com.amazonaws.services.kinesisanalytics.sinks.Log4jTableSink;
 import org.apache.commons.lang.StringUtils;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.connectors.kinesis.FlinkKinesisConsumer;
+import org.apache.flink.streaming.connectors.kinesis.FlinkKinesisProducer;
+import org.apache.flink.streaming.connectors.kinesis.config.AWSConfigConstants;
 import org.apache.flink.streaming.connectors.kinesis.config.ConsumerConfigConstants;
 
 import java.io.IOException;
@@ -23,7 +26,6 @@ import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.java.StreamTableEnvironment;
 import org.apache.flink.table.api.java.Tumble;
-import org.apache.flink.types.Row;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,11 +47,10 @@ import org.apache.flink.streaming.api.TimeCharacteristic;
  */
 public class StreamingJob {
 
-    private static final long TIME_WINDOW_IN_SECONDS = 60L;
 
     private static Logger LOG = LoggerFactory.getLogger(StreamingJob.class);
 
-    private static String VERSION = "1.0.5";
+    private static String VERSION = "1.1.0";
     private static String DEFAULT_REGION = "us-east-1";
     private static int DEFAULT_PARALLELISM = 4;
 
@@ -61,51 +62,95 @@ public class StreamingJob {
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         LOG.info("Starting Kinesis Analytics App Example > Version " + VERSION);
 
-        appProperties = getRuntimeConfigProperties();
+        appProperties = initRuntimeConfigProperties();
 
-        // use a specific input stream name
-        String streamName = getAppProperty("inputStreamName", "");
+        // get input stream name from App properties
+        String inputStreamName = getAppProperty("inputStreamName", "");
 
-        if (StringUtils.isBlank(streamName)) {
+        if (StringUtils.isBlank(inputStreamName)) {
             LOG.error("inputStreamName should be pass using AppProperties config within create-application API call");
             throw new Exception("inputStreamName should be pass using AppProperties config within create-application API call, aborting ...");
+        }
+
+        // get output stream name from App properties
+        String outputStreamName = getAppProperty("outputStreamName", "");
+
+        if (StringUtils.isBlank(outputStreamName)) {
+            LOG.error("outputStreamName should be pass using AppProperties config within create-application API call");
+            throw new Exception("outputStreamName should be pass using AppProperties config within create-application API call, aborting ...");
         }
 
         // use a specific input stream name
         String region = getAppProperty("region", DEFAULT_REGION);
 
-        int parallelism = getAppPropertyInt("parallelism", DEFAULT_PARALLELISM);
+        LOG.info("Starting Kinesis Analytics App Sample using " +
+                        "inputStreamName {} outputStreamName {} region {} parallelism {}",
+                        inputStreamName, outputStreamName, region, env.getParallelism());
 
-        String metricTag = getAppProperty("metricTag", "None");
-
-        LOG.info("Starting Kinesis Analytics App Sample using parallelism {} " +
-                        " stream {} region {} metricTag {} ",
-                parallelism, streamName, region, metricTag);
-
+        // use event time for Time windows
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
 
-        env.setParallelism(parallelism);
+        // Add kinesis source
+        // Notes: input data stream is a csv formatted string of following format
+        //      | appName, timestamp, appId, version |
+        DataStream<String> inputStream = getInputDataStream(env, inputStreamName, region);
 
-        // Add kinesis as source
+        // Add kinesis output
+        FlinkKinesisProducer<String> kinesisOutputSink = getKinesisOutputSink(outputStreamName, region);
+
+        StreamTableEnvironment tableEnv = TableEnvironment.getTableEnvironment(env);
+
+
+        //convert csv string to AppModel stream using a helper class
+        DataStream<AppModel> inputAppModelStream = CsvToAppModelStream.convert(inputStream);
+
+        //use table api, i.e. convert input stream to a table, use timestamp field as event time
+        Table inputTable = tableEnv.fromDataStream(inputAppModelStream,
+                "appName,appId,version,timestamp.rowtime");
+
+        //use table api for Tumbling window then group by application name and emit result
+        Table outputTable = inputTable
+                .window(Tumble.over("1.minutes").on("timestamp").as("w"))
+                .groupBy("w, appName")
+                .select("appName, w.start, w.end, version.min as minVersion, version.max as maxVersion, version.count as versionCount ");
+
+        //write input to log4j sink for debugging
+        inputTable.writeToSink(new Log4jTableSink("Input"));
+
+        //write output to log4j sink for debugging
+        outputTable.writeToSink(new Log4jTableSink("Output"));
+
+        //write output to kinesis stream
+        outputTable.writeToSink(new KinesisTableSink(kinesisOutputSink));
+
+        env.execute();
+    }
+
+    private static FlinkKinesisProducer<String> getKinesisOutputSink(String outputStreamName, String region) {
+        Properties producerConfig = new Properties();
+        // Required configs
+        producerConfig.put(AWSConfigConstants.AWS_REGION, region);
+        // Optional configs
+        producerConfig.put("RecordTtl", "30000");
+        producerConfig.put("RequestTimeout", "10000");
+        producerConfig.put("ThreadingModel", "POOLED");
+        producerConfig.put("ThreadPoolSize", "15");
+
+        FlinkKinesisProducer<String> kinesis = new FlinkKinesisProducer<>(new SimpleStringSchema(), producerConfig);
+        kinesis.setFailOnError(true);
+        kinesis.setDefaultStream(outputStreamName);
+        kinesis.setDefaultPartition("0");
+        return kinesis;
+    }
+
+    private static DataStream<String> getInputDataStream(StreamExecutionEnvironment env, String inputStreamName, String region) {
         Properties consumerConfig = new Properties();
         consumerConfig.put(ConsumerConfigConstants.AWS_REGION, region);
         consumerConfig.put(ConsumerConfigConstants.STREAM_INITIAL_POSITION, "LATEST");
 
-        DataStream<String> inputStream = env.addSource(new FlinkKinesisConsumer<>(
-                streamName, new SimpleStringSchema(), consumerConfig))
+        return env.addSource(new FlinkKinesisConsumer<>(
+                inputStreamName, new SimpleStringSchema(), consumerConfig))
                 .name("kinesis");
-
-        StreamTableEnvironment tableEnv = TableEnvironment.getTableEnvironment(env);
-        DataStream<AppModel> inputAppModelStream = CsvToAppModelStream.convert(inputStream);
-
-        Table table = tableEnv.fromDataStream(inputAppModelStream, "appName,appId,version,timestamp.rowtime");
-        Table output = table
-                .window(Tumble.over("1.minutes").on("timestamp").as("w"))
-                .groupBy("w, appName")
-                .select("appName, w.start, w.end, version.min as minVersion, version.max as maxVersion, version.count as versionCount ");
-        output.writeToSink(new Log4jTableSink());
-
-        env.execute();
     }
 
 
@@ -129,10 +174,10 @@ public class StreamingJob {
     }
 
     // helper method to return runtime properties for Property Group AppProperties
-    public static Properties getRuntimeConfigProperties() {
+    public static Properties initRuntimeConfigProperties() {
         try {
             Map<String, Properties> runConfigurations = KinesisAnalyticsRuntime.getApplicationProperties();
-            return (Properties) runConfigurations.get("AppProperties");
+            return runConfigurations.get("AppProperties");
         } catch (IOException var1) {
             LOG.error("Could not retrieve the runtime config properties for {}, exception {}", "AppProperties", var1);
             return null;
