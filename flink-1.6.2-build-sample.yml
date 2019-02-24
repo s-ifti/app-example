@@ -19,7 +19,7 @@ Parameters:
   SourceBranch:
     Description: Source Code repository branch
     Type: String
-    Default: master 
+    Default: table-api 
   Parallelism:
     Description: Parallelism to use within flink job (Max is 8)
     Type: String
