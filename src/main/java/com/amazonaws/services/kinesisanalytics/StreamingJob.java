@@ -100,7 +100,7 @@ public class StreamingJob {
 
         Table table = tableEnv.fromDataStream(inputAppModelStream, "appName,appId,version,timestamp.rowtime");
         Table output = table
-                .window(Tumble.over("1.minutes").on("rowtime").as("w"))
+                .window(Tumble.over("1.minutes").on("timestamp").as("w"))
                 .groupBy("w, appName")
                 .select("appName, w.start, w.end, version.min as minVersion, version.max as maxVersion, version.count as versionCount ");
         output.writeToSink(new Log4jTableSink<Row>());
