@@ -5,36 +5,37 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.sinks.AppendStreamTableSink;
 import org.apache.flink.table.sinks.TableSink;
+import org.apache.flink.types.Row;
 
-public class Log4jTableSink<T> implements AppendStreamTableSink<T> {
+public class Log4jTableSink implements AppendStreamTableSink<Row> {
     private String[] fieldNames;
     private TypeInformation[] fieldTypes;
-    private Log4jSink<T> log4jSink;
+    private Log4jSink<Row> log4jSink;
 
 
     public Log4jTableSink() {
 
     }
 
-    public Log4jTableSink(String[] fieldNames, TypeInformation<?>[] fieldTypes, Log4jSink<T> sink) {
+    public Log4jTableSink(String[] fieldNames, TypeInformation<?>[] fieldTypes, Log4jSink<Row> sink) {
         this.fieldNames = fieldNames;
         this.fieldTypes = fieldTypes;
         this.log4jSink = sink;
     }
     @Override
-    public void emitDataStream(DataStream<T> dataStream) {
+    public void emitDataStream(DataStream<Row> dataStream) {
         dataStream.addSink(this.log4jSink);
     }
 
     @Override
-    public TypeInformation<T> getOutputType() {
-        return TypeInformation.of(new TypeHint<T>() {});
+    public TypeInformation<Row> getOutputType() {
+        return TypeInformation.of(new TypeHint<Row>() {});
     }
 
     @Override
-    public TableSink<T> configure(String[] fieldNames, TypeInformation<?>[] fieldTypes) {
-        Log4jSink<T> sink = new Log4jSink<T>();
-        return new Log4jTableSink<T>(fieldNames, fieldTypes, sink);
+    public TableSink<Row> configure(String[] fieldNames, TypeInformation<?>[] fieldTypes) {
+        Log4jSink<Row> sink = new Log4jSink<Row>();
+        return new Log4jTableSink(fieldNames, fieldTypes, sink);
     }
 
     @Override

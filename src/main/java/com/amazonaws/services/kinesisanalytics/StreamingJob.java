@@ -103,7 +103,7 @@ public class StreamingJob {
                 .window(Tumble.over("1.minutes").on("timestamp").as("w"))
                 .groupBy("w, appName")
                 .select("appName, w.start, w.end, version.min as minVersion, version.max as maxVersion, version.count as versionCount ");
-        output.writeToSink(new Log4jTableSink<Row>());
+        output.writeToSink(new Log4jTableSink());
 
         env.execute();
     }
