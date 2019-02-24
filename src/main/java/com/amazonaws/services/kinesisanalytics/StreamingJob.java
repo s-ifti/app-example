@@ -98,7 +98,7 @@ public class StreamingJob {
         StreamTableEnvironment tableEnv = TableEnvironment.getTableEnvironment(env);
         DataStream<AppModel> inputAppModelStream = CsvToAppModelStream.convert(inputStream);
 
-        Table table = tableEnv.fromDataStream(inputAppModelStream, "appName,timestamp,appId,version,timestamp.rowtime");
+        Table table = tableEnv.fromDataStream(inputAppModelStream, "appName,appId,version,timestamp.rowtime");
         Table output = table
                 .window(Tumble.over("1.minutes").on("rowtime").as("w"))
                 .groupBy("w, appName")
