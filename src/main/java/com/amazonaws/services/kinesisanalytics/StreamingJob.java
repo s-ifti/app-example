@@ -35,7 +35,7 @@ import org.apache.flink.streaming.api.TimeCharacteristic;
 /**
  * A sample flink stream processing job.
  *
- * The app reads stream of app events and calculate min, max, and count
+ * The app reads stream of app events and calculate min, max, and count on version reported
  *
  * <p>For a tutorial how to write a Flink streaming application, check the
  * tutorials and examples on the <a href="http://flink.apache.org/docs/stable/">Flink Website</a>.
@@ -61,7 +61,7 @@ public class StreamingJob {
 
         // set up the streaming execution environment
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        LOG.info("Starting Kinesis Analytics App Example > Version " + VERSION);
+        LOG.warn("Starting Kinesis Analytics App Example > Version " + VERSION);
 
         appProperties = initRuntimeConfigProperties();
 
@@ -84,7 +84,7 @@ public class StreamingJob {
         // use a specific input stream name
         String region = getAppProperty("region", DEFAULT_REGION);
 
-        LOG.info("Starting Kinesis Analytics App Sample using " +
+        LOG.warn("Starting Kinesis Analytics App Sample using " +
                         "inputStreamName {} outputStreamName {} region {} parallelism {}",
                         inputStreamName, outputStreamName, region, env.getParallelism());
 

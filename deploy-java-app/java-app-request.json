@@ -22,7 +22,7 @@
       },
       "MonitoringConfiguration": {
         "ConfigurationType": "CUSTOM",
-        "LogLevel": "INFO",
+        "LogLevel": "WARN",
         "MetricsLevel": "APPLICATION"
       },
       "ParallelismConfiguration": {

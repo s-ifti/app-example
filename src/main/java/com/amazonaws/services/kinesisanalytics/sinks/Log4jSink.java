@@ -40,10 +40,10 @@ public class Log4jSink<T> extends RichSinkFunction<T> implements CheckpointedFun
     @Override
     public void invoke(T document)  {
         if(document != null) {
-            LOG.info(logHeader +": " + document.toString());
+            LOG.warn(logHeader +": " + document.toString());
         }
         else {
-            LOG.info(logHeader + ": null");
+            LOG.warn(logHeader + ": null");
         }
     }
 
