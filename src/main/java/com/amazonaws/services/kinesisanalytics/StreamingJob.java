@@ -133,6 +133,7 @@ public class StreamingJob {
         producerConfig.put(AWSConfigConstants.AWS_REGION, region);
         // Optional configs
         producerConfig.put("RecordTtl", "30000");
+        producerConfig.put("AggregationEnabled", "false");
         producerConfig.put("RequestTimeout", "10000");
         producerConfig.put("ThreadingModel", "POOLED");
         producerConfig.put("ThreadPoolSize", "15");
