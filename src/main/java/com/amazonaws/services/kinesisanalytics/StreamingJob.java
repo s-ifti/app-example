@@ -5,32 +5,25 @@
 
 package com.amazonaws.services.kinesisanalytics;
 
+import com.amazonaws.services.kinesisanalytics.converters.CsvToAppModelStream;
 import com.amazonaws.services.kinesisanalytics.runtime.KinesisAnalyticsRuntime;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.amazonaws.services.kinesisanalytics.sinks.Log4jTableSink;
 import org.apache.commons.lang.StringUtils;
-import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
-import org.apache.flink.api.common.typeinfo.TypeHint;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.AssignerWithPeriodicWatermarks;
-import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
-import org.apache.flink.streaming.api.watermark.Watermark;
-import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.streaming.connectors.kinesis.FlinkKinesisConsumer;
 import org.apache.flink.streaming.connectors.kinesis.config.ConsumerConfigConstants;
 
 import java.io.IOException;
-import java.sql.Timestamp;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.Map;
 import java.util.Properties;
 
-import org.apache.flink.util.Collector;
+import org.apache.flink.table.api.Table;
+import org.apache.flink.table.api.TableEnvironment;
+import org.apache.flink.table.api.java.StreamTableEnvironment;
+import org.apache.flink.table.api.java.Tumble;
+import org.apache.flink.types.Row;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +46,7 @@ import org.apache.flink.streaming.api.TimeCharacteristic;
 public class StreamingJob {
 
     private static final long TIME_WINDOW_IN_SECONDS = 60L;
+
     private static Logger LOG = LoggerFactory.getLogger(StreamingJob.class);
 
     private static String VERSION = "1.0.5";
@@ -101,69 +95,15 @@ public class StreamingJob {
                 streamName, new SimpleStringSchema(), consumerConfig))
                 .name("kinesis");
 
+        StreamTableEnvironment tableEnv = TableEnvironment.getTableEnvironment(env);
+        DataStream<AppModel> inputAppModelStream = CsvToAppModelStream.convert(inputStream);
 
-        // an example App stream processing job graph
-        DataStream<Tuple2<String, AppModel>> sampleApp =
-                //start with inputStream
-                inputStream
-                        //process JSON and return a model POJO class
-                        .map(c -> {
-                            ObjectMapper mapper = new ObjectMapper();
-                            JsonNode jsonNode = mapper.readValue(c, JsonNode.class);
-                            Timestamp timestamp = null;
-                            try {
-                                SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss.SSS");
-                                Date parsedDate = dateFormat.parse(jsonNode.get("dataTimestamp").asText());
-                                timestamp = new java.sql.Timestamp(parsedDate.getTime());
-                            } catch (Exception e) {
-                                LOG.error("Error processing timestamp " + e.toString());
-                            }
-                            int version = 0;
-                            try {
-                                version = jsonNode.get("version").asInt();
-                            } catch (Exception e) {
-                            }
-
-                            return new AppModel(
-                                    jsonNode.get("appName").asText(),
-                                    jsonNode.get("appId").asText(),
-                                    version,
-                                    timestamp
-                            );
-
-                        }).
-                        returns(AppModel.class)
-                        .name("map_AppModelPOJO")
-                        //assign timestamp for time window processing
-                        .assignTimestampsAndWatermarks(new TimeLagWatermarkGenerator())
-                        .name("timestamp")
-                        //create tuple of App Name
-                        //log input app object
-                        .map(appEvent -> {
-                                    LOG.info("App: " + appEvent.toString());
-                                    return new Tuple2<>(appEvent.getAppName(), appEvent);
-                                }
-                        ).returns(TypeInformation.of(new TypeHint<Tuple2<String, AppModel>>() {
-                        }))
-                        .name("map_AppName_Version_Tuple");
-
-        DataStream<Tuple2<String, Stats>> statsOutput = sampleApp
-                //partition by app name (e.g. facebook, googledeadplus, chime, etc....)
-                .keyBy(x -> x.f0)
-                .timeWindow(org.apache.flink.streaming.api.windowing.time.Time.seconds(TIME_WINDOW_IN_SECONDS))
-                //calc stats for last time window
-                .aggregate(new StatsAggregate(), new MyProcessWindowFunction())
-                .name("stats_TimeWindow")
-                .map(stats -> {
-                    LOG.info("APP {}, {} ", stats.f0, stats.f1.toString());
-                    return stats;
-                }).returns(TypeInformation.of(new TypeHint<Tuple2<String, Stats>>() {
-                }))
-                .name("map_logToCW");
-
-
-        statsOutput.print()
-                .name("stdout");
+        Table table = tableEnv.fromDataStream(inputAppModelStream);
+        Table output = table
+                .window(Tumble.over("1.minutes").on("timestamp").as("w"))
+                .groupBy("w, appName")
+                .select("appName, w.start, w.end, version.min as minVersion, version.max as maxVersion, version.count as versionCount ");
+        output.writeToSink(new Log4jTableSink<Row>());
 
         env.execute();
     }
@@ -199,78 +139,4 @@ public class StreamingJob {
         }
     }
 
-
-    // Helper Function definitions for time window processing
-
-    /**
-     * The Stats accumulator is used to keep a running sum and a count.
-     * see https://ci.apache.org/projects/flink/flink-docs-stable/dev/stream/operators/windows.html#incremental-window-aggregation-with-aggregatefunction
-     */
-    private static class StatsAggregate
-            implements AggregateFunction<Tuple2<String, AppModel>, Stats, Stats> {
-        @Override
-        public Stats createAccumulator() {
-            //start accumulator
-            return new Stats( /* min start */ Double.MAX_VALUE, /* max start */ Double.MIN_VALUE, 0.0, 0.0);
-        }
-
-        @Override
-        public Stats add(Tuple2<String, AppModel> value, Stats accumulator) {
-            return new Stats(
-                    Math.min(accumulator.getMin(), value.f1.getVersion()),
-                    Math.max(accumulator.getMax(), value.f1.getVersion()),
-                    accumulator.getCount() + 1L,
-                    accumulator.getSum() + value.f1.getVersion()
-            );
-        }
-
-        @Override
-        public Stats getResult(Stats accumulator) {
-            return accumulator;
-        }
-
-        @Override
-        public Stats merge(Stats a, Stats b) {
-            return new Stats(
-                    Math.min(a.getMin(), b.getMin()),
-                    Math.max(a.getMax(), b.getMax()),
-                    a.getCount() + b.getCount(),
-                    a.getSum() + b.getSum()
-            );
-        }
-    }
-
-    /**
-     * Proessing window to return stats using a string key.
-     * see https://ci.apache.org/projects/flink/flink-docs-stable/dev/stream/operators/windows.html#incremental-window-aggregation-with-aggregatefunction
-     */
-    private static class MyProcessWindowFunction
-            extends ProcessWindowFunction<Stats, Tuple2<String, Stats>, String, TimeWindow> {
-
-        public void process(String key,
-                            Context context,
-                            Iterable<Stats> aggregates,
-                            Collector<Tuple2<String, Stats>> out) {
-            Stats stats = aggregates.iterator().next();
-            out.collect(new Tuple2<>(key, stats));
-        }
-    }
-
-
-    // for generating timestamp and watermark, required for using any time Window processing
-    public static class TimeLagWatermarkGenerator implements AssignerWithPeriodicWatermarks<AppModel> {
-
-        private final long maxTimeLag = 5000; // 5 seconds
-
-        @Override
-        public long extractTimestamp(AppModel app, long previousElementTimestamp) {
-            return app.getTimestamp().toInstant().toEpochMilli();
-        }
-
-        @Override
-        public Watermark getCurrentWatermark() {
-            // return the watermark as current time minus the maximum time lag
-            return new Watermark(System.currentTimeMillis() - maxTimeLag);
-        }
-    }
 }

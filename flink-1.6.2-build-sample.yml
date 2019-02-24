@@ -163,7 +163,8 @@ Resources:
                 timeString = evtTime.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
                 appId = "\"" + str(uuid.uuid4()) + "\""
                 appVersion = 50 + random.randint(-20,30)
-                message ="{\"appName\": \"" + apps[random.randint(0,len(apps)-1)] + "\", \"dataTimestamp\":\"" + timeString + "\",\"appId\": " + appId + ", \"version\":" + str(appVersion) + "}"
+                #send csv
+                message =apps[random.randint(0,len(apps)-1)] + ", " + timeString + "," + appId + "," + str(appVersion) + ""
                 
                 
                 print("sending app message: " + message)
