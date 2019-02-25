@@ -19,7 +19,7 @@ Parameters:
   SourceBranch:
     Description: Source Code repository branch
     Type: String
-    Default: table-api 
+    Default: table-api-json 
   Parallelism:
     Description: Parallelism to use within flink job (Max is 8)
     Type: String
@@ -162,12 +162,11 @@ Resources:
                     print("TIME UP")
                     break
                 timeString = evtTime.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                appId = str(uuid.uuid4())
+                appSessionId = str(uuid.uuid4())
                 appVersion = 50 + random.randint(-20,30)
-                #send csv format
-                #  appName, timestamp, appId, version
-                message =apps[random.randint(0,len(apps)-1)] + ", " + timeString + "," + appId + "," + str(appVersion) + ""
-                
+                #send new JSON format
+                message ="{\"Ad Media Type\": \"Chrome1 419\", \"App Name\": \"" + apps[random.randint(0,len(apps)-1)] + "\", \"Timestamp\":\"" + timeString + "\",\"App Session ID\": " + appSessionId + ", \"App Version\":" + str(appVersion) + "}"
+
                 
                 print("sending app message: " + message)
                 response = client.put_record(

@@ -1,5 +1,7 @@
 package com.amazonaws.services.kinesisanalytics;
 
+import com.google.gson.annotations.SerializedName;
+
 import java.sql.Timestamp;
 
 /**
@@ -15,23 +17,30 @@ public class AppModel {
 
     public AppModel(String appName, String appId, Integer version, Timestamp timestamp) {
         this.appName = appName;
-        this.appId = appId;
+        this.appSessionId = appId;
         this.version = version;
         this.timestamp = timestamp;
 
     }
 
+    @SerializedName("App Name")
     private String appName;
-    private String appId;
+
+    @SerializedName("App Session ID")
+    private String appSessionId;
+
+    @SerializedName("App Version")
     private Integer version;
+
+    @SerializedName("Timestamp")
     private Timestamp timestamp;
 
-    public void setAppId(String appId) {
-        this.appId = appId;
+    public void setAppSessionId(String appSessionId) {
+        this.appSessionId = appSessionId;
     }
 
-    public String getAppId() {
-        return this.appId;
+    public String getAppSessionId() {
+        return this.appSessionId;
     }
 
     public void setAppName(String appName) {
@@ -59,7 +68,7 @@ public class AppModel {
     }
 
     public String toString() {
-        return "APP: " + appName + " TIMESTAMP: " + timestamp + " appId: " + appId + " Version: " + version;
+        return "APP: " + appName + " TIMESTAMP: " + timestamp + " appSessionId: " + appSessionId + " Version: " + version;
     }
 
 
