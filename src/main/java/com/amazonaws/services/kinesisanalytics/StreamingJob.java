@@ -109,7 +109,7 @@ public class StreamingJob {
         //write input to log4j sink for debugging
         inputTable.writeToSink(new Log4jTableSink("Input"));
 
-        for(int i=0; i< 20; i++ ) {
+        for(int i=0; i< 50; i++ ) {
             //use table api for Tumbling window then group by application name and emit result
             Table outputTable = inputTable
                     .window(Tumble.over("1.minutes").on("timestamp").as("w"))
