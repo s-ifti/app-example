@@ -165,7 +165,7 @@ Resources:
                 appSessionId = str(uuid.uuid4())
                 appVersion = 50 + random.randint(-20,30)
                 #send new JSON format
-                message ="{\"Ad Media Type\": \"Chrome1 419\", \"App Name\": \"" + apps[random.randint(0,len(apps)-1)] + "\", \"Timestamp\":\"" + timeString + "\",\"App Session ID\": " + appSessionId + ", \"App Version\":" + str(appVersion) + "}"
+                message ="{\"Ad Media Type\": \"Chrome1 419\", \"App Name\": \"" + apps[random.randint(0,len(apps)-1)] + "\", \"Timestamp\":\"" + timeString + "\",\"App Session ID\": \"" + appSessionId + "\", \"App Version\":" + str(appVersion) + "}"
 
                 
                 print("sending app message: " + message)
