@@ -68,7 +68,7 @@ public class AppModel {
     }
 
     public String toString() {
-        return "APP: " + appName + " TIMESTAMP: " + timestamp + " appSessionId: " + appSessionId + " Version: " + version;
+        return "App Name: " + appName + " Timestamp: " + timestamp + " App Session ID: " + appSessionId + " App Version: " + version;
     }
 
 

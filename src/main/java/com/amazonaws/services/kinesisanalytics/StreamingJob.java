@@ -6,7 +6,7 @@
 
 package com.amazonaws.services.kinesisanalytics;
 
-import com.amazonaws.services.kinesisanalytics.converters.CsvToAppModelStream;
+import com.amazonaws.services.kinesisanalytics.converters.JsonToAppModelStream;
 import com.amazonaws.services.kinesisanalytics.runtime.KinesisAnalyticsRuntime;
 import com.amazonaws.services.kinesisanalytics.sinks.KinesisTableSink;
 import com.amazonaws.services.kinesisanalytics.sinks.Log4jTableSink;
@@ -92,18 +92,16 @@ public class StreamingJob {
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
 
         // Add kinesis source
-        // Notes: input data stream is a csv formatted string of following format
-        //          appName, timestamp, appId, version
+        // Notes: input data stream is a json formatted string
         DataStream<String> inputStream = getInputDataStream(env, inputStreamName, region);
 
         // Add kinesis output
         FlinkKinesisProducer<String> kinesisOutputSink = getKinesisOutputSink(outputStreamName, region);
 
         StreamTableEnvironment tableEnv = TableEnvironment.getTableEnvironment(env);
-
-
-        //convert csv string to AppModel stream using a helper class
-        DataStream<AppModel> inputAppModelStream = CsvToAppModelStream.convert(inputStream);
+        
+        //convert json string to AppModel stream using a helper class
+        DataStream<AppModel> inputAppModelStream = JsonToAppModelStream.convert(inputStream);
 
         //use table api, i.e. convert input stream to a table, use timestamp field as event time
         Table inputTable = tableEnv.fromDataStream(inputAppModelStream,
