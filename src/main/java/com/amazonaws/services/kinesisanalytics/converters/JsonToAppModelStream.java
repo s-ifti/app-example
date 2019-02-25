@@ -7,14 +7,11 @@ import org.slf4j.LoggerFactory;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
-import java.sql.Timestamp;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 
 public class JsonToAppModelStream {
 
     final static GsonBuilder builder = new GsonBuilder();
-    final static Gson gson = builder.create();
+    final static Gson gson = builder.setDateFormat("yyyy-MM-dd hh:mm:ss.SSS").create();
 
     private static Logger LOG = LoggerFactory.getLogger(JsonToAppModelStream.class);
 
