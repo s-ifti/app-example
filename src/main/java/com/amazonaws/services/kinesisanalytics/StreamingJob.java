@@ -106,21 +106,26 @@ public class StreamingJob {
         //use table api, i.e. convert input stream to a table, use timestamp field as event time
         Table inputTable = tableEnv.fromDataStream(inputAppModelStream,
                 "appName,appSessionId,version,timestamp.rowtime");
-
-        //use table api for Tumbling window then group by application name and emit result
-        Table outputTable = inputTable
-                .window(Tumble.over("1.minutes").on("timestamp").as("w"))
-                .groupBy("w, appName")
-                .select("appName, w.start, w.end, version.min as minVersion, version.max as maxVersion, version.count as versionCount ");
-
         //write input to log4j sink for debugging
         inputTable.writeToSink(new Log4jTableSink("Input"));
 
-        //write output to log4j sink for debugging
-        outputTable.writeToSink(new Log4jTableSink("Output"));
+        for(int i=0; i< 20; i++ ) {
+            //use table api for Tumbling window then group by application name and emit result
+            Table outputTable = inputTable
+                    .window(Tumble.over("1.minutes").on("timestamp").as("w"))
+                    .groupBy("w, appName")
+                    .select("appName, w.start, w.end, version.min as minVersion, version.max as maxVersion, version.count as versionCount ");
 
-        //write output to kinesis stream
-        outputTable.writeToSink(new KinesisTableSink(kinesisOutputSink));
+
+            //write output to log4j sink for debugging
+            outputTable.writeToSink(new Log4jTableSink("Output#"+i));
+
+            //write output to kinesis stream
+            if(i == 0 ) {
+                outputTable.writeToSink(new KinesisTableSink(kinesisOutputSink));
+            }
+
+        }
 
         env.execute();
     }
