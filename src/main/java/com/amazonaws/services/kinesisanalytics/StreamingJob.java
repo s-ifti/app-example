@@ -105,7 +105,7 @@ public class StreamingJob {
 
         //use table api, i.e. convert input stream to a table, use timestamp field as event time
         Table inputTable = tableEnv.fromDataStream(inputAppModelStream,
-                "appName,appId,version,timestamp.rowtime");
+                "appName,appSessionId,version,timestamp.rowtime");
 
         //use table api for Tumbling window then group by application name and emit result
         Table outputTable = inputTable
