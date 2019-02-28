@@ -11,6 +11,7 @@ import org.apache.flink.types.Row;
 
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
@@ -45,7 +46,7 @@ public class CWMetricTableSink implements AppendStreamTableSink<Row> {
 
          */
         dataStream.map(row ->
-                (List<CloudwatchMetricTupleModel>) ImmutableList.of(
+                Arrays.asList(
                         new CloudwatchMetricTupleModel(
                                 /* app name */
                                 row.getField(0).toString(),

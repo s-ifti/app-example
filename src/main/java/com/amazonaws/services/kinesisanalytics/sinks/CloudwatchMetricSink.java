@@ -107,7 +107,7 @@ public class CloudwatchMetricSink extends RichSinkFunction<List<CloudwatchMetric
                 flushValuesBuffer();
             } catch (Exception e) {
                 //if the request fails, that's fine, just retry on the next invocation
-                LOG.error("Issue flushing metrics buffer : " + e.toString());
+                LOG.error("Issue flushing CW metrics buffer : " + e.toString());
             }
         }
     }
@@ -141,8 +141,7 @@ public class CloudwatchMetricSink extends RichSinkFunction<List<CloudwatchMetric
             try {
                 flushValuesBuffer();
             } catch (Exception e) {
-                //if the request fails, that's fine, just retry on the next iteration
-               LOG.error("snapshotState Issue flushing buffer : " + e.toString());
+               LOG.error("snapshotState Issue flushing CW metric buffer : " + e.toString());
 
             }
         } while (! values.isEmpty());
