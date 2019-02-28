@@ -55,10 +55,10 @@ public class CsvToAppModelStream {
                     );
 
                 }).returns(AppModel.class)
-                .name("inputAppModelStream")
+                .name("inputAppModelStream");
                 //assign timestamp for time window processing
-                .assignTimestampsAndWatermarks(new TimeLagWatermarkGenerator())
-                .name("timestamp");
+                //.assignTimestampsAndWatermarks(new TimeLagWatermarkGenerator())
+                //.name("timestamp");
 
     }
 }

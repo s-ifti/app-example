@@ -51,7 +51,7 @@ public class StreamingJob {
 
     private static Logger LOG = LoggerFactory.getLogger(StreamingJob.class);
 
-    private static String VERSION = "1.1.1";
+    private static String VERSION = "1.1.2";
     private static String DEFAULT_REGION = "us-east-1";
     private static int DEFAULT_PARALLELISM = 4;
 
