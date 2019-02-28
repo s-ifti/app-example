@@ -69,9 +69,8 @@ public class CWMetricTableSink implements AppendStreamTableSink<Row> {
                         )
 
                 )
-
-        )
-                .addSink(this.cloudwatchMetricSink);
+        ).returns(TypeInformation.of(new TypeHint<List<CloudwatchMetricTupleModel>>(){}))
+        .addSink(this.cloudwatchMetricSink);
     }
 
 
