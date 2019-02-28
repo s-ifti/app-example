@@ -6,6 +6,7 @@
 
 package com.amazonaws.services.kinesisanalytics;
 
+import com.amazonaws.services.kinesisanalytics.converters.AppModelTableSource;
 import com.amazonaws.services.kinesisanalytics.converters.CsvToAppModelStream;
 import com.amazonaws.services.kinesisanalytics.runtime.KinesisAnalyticsRuntime;
 import com.amazonaws.services.kinesisanalytics.sinks.KinesisTableSink;
@@ -27,6 +28,7 @@ import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.java.StreamTableEnvironment;
 import org.apache.flink.table.api.java.Tumble;
+import org.apache.flink.types.Row;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -110,11 +112,12 @@ public class StreamingJob {
 
         //use table api, i.e. convert input stream to a table, use timestamp field processing time for windowing
         Table inputTable = tableEnv.fromDataStream(inputAppModelStream,
-                "appName,appId,version,timestamp.proctime as newproctime");
+                "appName,appId,version");
+        AppModelTableSource appModelAsTableSource = new AppModelTableSource(tableEnv.toDataStream(inputTable, Row.class) );
 
         //use table api for Tumbling window then group by application name and emit result
         Table outputTable = inputTable
-                .window(Tumble.over("1.minutes").on("newproctime").as("w"))
+                .window(Tumble.over("1.minutes").on("myProcTime").as("w"))
                 .groupBy("w, appName")
                 .select("appName, w.start, w.end, version.min as minVersion, version.max as maxVersion, version.count as versionCount ");
 
