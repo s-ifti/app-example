@@ -112,13 +112,13 @@ public class StreamingJob {
 
         //use table api, i.e. convert input stream to a table, use timestamp field processing time for windowing
         Table inputTable = tableEnv.fromDataStream(inputAppModelStream,
-                "appName,appId,version");
-        AppModelTableSource appModelAsTableSource = new AppModelTableSource(tableEnv.toDataStream(inputTable, Row.class) );
-        tableEnv.registerTableSource("procTable", appModelAsTableSource);
+                "appName,appId,version, myProcTime.proctime");
+        //AppModelTableSource appModelAsTableSource = new AppModelTableSource(tableEnv.toDataStream(inputTable, Row.class) );
+        //tableEnv.registerTableSource("procTable", appModelAsTableSource);
 
 
         //use table api for Tumbling window then group by application name and emit result
-        Table outputTable = tableEnv.scan("procTable")
+        Table outputTable = inputTable
                 .window(Tumble.over("1.minutes").on("myProcTime").as("w"))
                 .groupBy("w, appName")
                 .select("appName, w.start, w.end, version.min as minVersion, version.max as maxVersion, version.count as versionCount ");
