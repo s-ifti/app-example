@@ -51,7 +51,7 @@ public class StreamingJob {
 
     private static Logger LOG = LoggerFactory.getLogger(StreamingJob.class);
 
-    private static String VERSION = "1.1.0";
+    private static String VERSION = "1.1.1";
     private static String DEFAULT_REGION = "us-east-1";
     private static int DEFAULT_PARALLELISM = 4;
 
@@ -81,6 +81,9 @@ public class StreamingJob {
             throw new Exception("outputStreamName should be pass using AppProperties config within create-application API call, aborting ...");
         }
 
+        // get input stream name from App properties
+        String metricTag = getAppProperty("metricTag", "NoneMetricTag");
+
         // use a specific input stream name
         String region = getAppProperty("region", DEFAULT_REGION);
 
@@ -105,9 +108,9 @@ public class StreamingJob {
         //convert csv string to AppModel stream using a helper class
         DataStream<AppModel> inputAppModelStream = CsvToAppModelStream.convert(inputStream);
 
-        //use table api, i.e. convert input stream to a table, use timestamp field as event time
+        //use table api, i.e. convert input stream to a table, use timestamp field processing time for windowing
         Table inputTable = tableEnv.fromDataStream(inputAppModelStream,
-                "appName,appId,version,timestamp.rowtime");
+                "appName,appId,version,timestamp.proctime");
 
         //use table api for Tumbling window then group by application name and emit result
         Table outputTable = inputTable
@@ -116,14 +119,13 @@ public class StreamingJob {
                 .select("appName, w.start, w.end, version.min as minVersion, version.max as maxVersion, version.count as versionCount ");
 
         //write input to log4j sink for debugging
-        inputTable.writeToSink(new Log4jTableSink("Input"));
+        //inputTable.writeToSink(new Log4jTableSink("Input"));
 
         //write output to log4j sink for debugging
-        outputTable.writeToSink(new Log4jTableSink("Output"));
+        outputTable.writeToSink(new Log4jTableSink("Output", metricTag));
 
         //write output to kinesis stream
         outputTable.writeToSink(new KinesisTableSink(kinesisOutputSink));
-
         env.execute();
     }
 

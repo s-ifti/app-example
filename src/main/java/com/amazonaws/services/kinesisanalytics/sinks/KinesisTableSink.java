@@ -11,7 +11,6 @@ import org.apache.flink.types.Row;
 /**
  * Kinesis table sink that can be used with table api to write an output to kinesis stream.
  * NOTE: This implementation only support an already serialized string as the output type.
- *
  */
 public class KinesisTableSink implements AppendStreamTableSink<Row> {
     private String[] fieldNames;
@@ -24,8 +23,8 @@ public class KinesisTableSink implements AppendStreamTableSink<Row> {
     }
 
     private KinesisTableSink(String[] fieldNames,
-                            TypeInformation<?>[] fieldTypes,
-                            FlinkKinesisProducer<String> sink) {
+                             TypeInformation<?>[] fieldTypes,
+                             FlinkKinesisProducer<String> sink) {
         this.fieldNames = fieldNames;
         this.fieldTypes = fieldTypes;
         this.kinesisProducerSink = sink;
@@ -44,7 +43,8 @@ public class KinesisTableSink implements AppendStreamTableSink<Row> {
 
     @Override
     public TypeInformation<Row> getOutputType() {
-        return TypeInformation.of(new TypeHint<Row>() {});
+        return TypeInformation.of(new TypeHint<Row>() {
+        });
     }
 
     @Override
