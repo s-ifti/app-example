@@ -114,9 +114,11 @@ public class StreamingJob {
         Table inputTable = tableEnv.fromDataStream(inputAppModelStream,
                 "appName,appId,version");
         AppModelTableSource appModelAsTableSource = new AppModelTableSource(tableEnv.toDataStream(inputTable, Row.class) );
+        tableEnv.registerTableSource("procTable", appModelAsTableSource);
+
 
         //use table api for Tumbling window then group by application name and emit result
-        Table outputTable = inputTable
+        Table outputTable = tableEnv.scan("procTable")
                 .window(Tumble.over("1.minutes").on("myProcTime").as("w"))
                 .groupBy("w, appName")
                 .select("appName, w.start, w.end, version.min as minVersion, version.max as maxVersion, version.count as versionCount ");
