@@ -51,7 +51,7 @@ public class StreamingJob {
 
     private static Logger LOG = LoggerFactory.getLogger(StreamingJob.class);
 
-    private static String VERSION = "1.1.2";
+    private static String VERSION = "1.1.3";
     private static String DEFAULT_REGION = "us-east-1";
     private static int DEFAULT_PARALLELISM = 4;
 
@@ -110,11 +110,11 @@ public class StreamingJob {
 
         //use table api, i.e. convert input stream to a table, use timestamp field processing time for windowing
         Table inputTable = tableEnv.fromDataStream(inputAppModelStream,
-                "appName,appId,version,timestamp.proctime");
+                "appName,appId,version,timestamp.proctime as newproctime");
 
         //use table api for Tumbling window then group by application name and emit result
         Table outputTable = inputTable
-                .window(Tumble.over("1.minutes").on("timestamp").as("w"))
+                .window(Tumble.over("1.minutes").on("newproctime").as("w"))
                 .groupBy("w, appName")
                 .select("appName, w.start, w.end, version.min as minVersion, version.max as maxVersion, version.count as versionCount ");
 
