@@ -45,7 +45,11 @@
           }
         }
       ]
-    }
+    },
+    "ApplicationSnapshotConfiguration":
+     {
+       "SnapshotsEnabled": false
+     }
   },
   "CloudWatchLoggingOptions": [
     {
