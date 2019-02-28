@@ -8,6 +8,7 @@ package com.amazonaws.services.kinesisanalytics;
 
 import com.amazonaws.services.kinesisanalytics.converters.JsonToAppModelStream;
 import com.amazonaws.services.kinesisanalytics.runtime.KinesisAnalyticsRuntime;
+import com.amazonaws.services.kinesisanalytics.sinks.CWMetricTableSink;
 import com.amazonaws.services.kinesisanalytics.sinks.KinesisTableSink;
 import com.amazonaws.services.kinesisanalytics.sinks.Log4jTableSink;
 import org.apache.commons.lang.StringUtils;
@@ -88,6 +89,8 @@ public class StreamingJob {
                         "inputStreamName {} outputStreamName {} region {} parallelism {}",
                         inputStreamName, outputStreamName, region, env.getParallelism());
 
+        String metricTag = getAppProperty("metricTag", "NullMetricTag");
+
         // use event time for Time windows
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
 
@@ -105,19 +108,23 @@ public class StreamingJob {
 
         //use table api, i.e. convert input stream to a table, use timestamp field as event time
         Table inputTable = tableEnv.fromDataStream(inputAppModelStream,
-                "appName,appSessionId,version,timestamp.rowtime");
+                "appName,appSessionId,version,processingTimestamp.rowtime");
 
         //use table api for Tumbling window then group by application name and emit result
         Table outputTable = inputTable
-                .window(Tumble.over("1.minutes").on("timestamp").as("w"))
+                .window(Tumble.over("1.minutes").on("processingTimestamp").as("w"))
                 .groupBy("w, appName")
                 .select("appName, w.start, w.end, version.min as minVersion, version.max as maxVersion, version.count as versionCount ");
 
         //write input to log4j sink for debugging
-        inputTable.writeToSink(new Log4jTableSink("Input"));
+        //do not log input for scale test
+        //inputTable.writeToSink(new Log4jTableSink("Input"));
 
+        //do not write output for scale test, rather use CW metric sink
         //write output to log4j sink for debugging
-        outputTable.writeToSink(new Log4jTableSink("Output"));
+        //outputTable.writeToSink(new Log4jTableSink("Output"));
+
+        outputTable.writeToSink(new CWMetricTableSink(metricTag));
 
         //write output to kinesis stream
         outputTable.writeToSink(new KinesisTableSink(kinesisOutputSink));
