@@ -91,8 +91,8 @@ public class StreamingJob {
 
         String metricTag = getAppProperty("metricTag", "NullMetricTag");
 
-        // use event time for Time windows
-        env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
+        // use processing time for Time windows
+        env.setStreamTimeCharacteristic(TimeCharacteristic.ProcessingTime);
 
         // Add kinesis source
         // Notes: input data stream is a json formatted string
@@ -108,11 +108,11 @@ public class StreamingJob {
 
         //use table api, i.e. convert input stream to a table, use timestamp field as event time
         Table inputTable = tableEnv.fromDataStream(inputAppModelStream,
-                "appName,appSessionId,version,processingTimestamp.rowtime");
+                "appName,appSessionId,version,timestamp.proctime");
 
         //use table api for Tumbling window then group by application name and emit result
         Table outputTable = inputTable
-                .window(Tumble.over("1.minutes").on("processingTimestamp").as("w"))
+                .window(Tumble.over("1.minutes").on("timestamp").as("w"))
                 .groupBy("w, appName")
                 .select("appName, w.start, w.end, version.min as minVersion, version.max as maxVersion, version.count as versionCount ");
 
