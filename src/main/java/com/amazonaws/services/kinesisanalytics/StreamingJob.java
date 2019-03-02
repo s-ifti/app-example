@@ -110,25 +110,29 @@ public class StreamingJob {
         Table inputTable = tableEnv.fromDataStream(inputAppModelStream,
                 "appName,appSessionId,version,appProcessingTime.proctime");
 
-        //use table api for Tumbling window then group by application name and emit result
-        Table outputTable = inputTable
-                .window(Tumble.over("1.minutes").on("appProcessingTime").as("w"))
-                .groupBy("w, appName")
-                .select("appName, w.start, w.end, version.min as minVersion, version.max as maxVersion, version.count as versionCount ");
+        for (int q = 0; q < 100; q++) {
+            //use table api for Tumbling window then group by application name and emit result
+            Table outputTable = inputTable
+                    .window(Tumble.over("1.minutes").on("appProcessingTime").as("w"))
+                    .groupBy("w, appName")
+                    .select("appName, w.start, w.end, version.min as minVersion, version.max as maxVersion, version.count as versionCount ");
 
-        //write input to log4j sink for debugging
-        //do not log input for scale test
-        //inputTable.writeToSink(new Log4jTableSink("Input"));
+            //write input to log4j sink for debugging
+            //do not log input for scale test
+            //inputTable.writeToSink(new Log4jTableSink("Input"));
 
-        //do not write output for scale test, rather use CW metric sink
-        //write output to log4j sink for debugging
-        //outputTable.writeToSink(new Log4jTableSink("Output"));
+            //do not write output for scale test, rather use CW metric sink
+            //write output to log4j sink for debugging
+            //outputTable.writeToSink(new Log4jTableSink("Output"));
 
-        outputTable.writeToSink(new CWMetricTableSink(metricTag));
+            outputTable.writeToSink(new CWMetricTableSink(metricTag + "-query-" + q));
 
-        //write output to kinesis stream
-        outputTable.writeToSink(new KinesisTableSink(kinesisOutputSink));
-
+            //use one output kinesis stream for test
+            if (q == 0) {
+                //write output to kinesis stream
+                outputTable.writeToSink(new KinesisTableSink(kinesisOutputSink));
+            }
+        }
         env.execute();
     }
 
