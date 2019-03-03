@@ -41,7 +41,8 @@
             "outputStreamName": "#{OUTPUT_STREAM}",
             "metricTag": "#{APP_NAME}",
             "region" : "#{TEST_REGION}",
-            "parallelism" : "#{PARALLELISM}"
+            "parallelism" : "#{PARALLELISM}",
+            "numQueries": "#{PARALLELISM}"
           }
         }
       ]

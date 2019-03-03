@@ -90,7 +90,7 @@ public class StreamingJob {
                         inputStreamName, outputStreamName, region, env.getParallelism());
 
         String metricTag = getAppProperty("metricTag", "NullMetricTag");
-
+        int numMaxQueries = getAppPropertyInt("numQueries", 1);
         // use processing time for Time windows
         env.setStreamTimeCharacteristic(TimeCharacteristic.ProcessingTime);
 
@@ -110,7 +110,7 @@ public class StreamingJob {
         Table inputTable = tableEnv.fromDataStream(inputAppModelStream,
                 "appName,appSessionId,version,appProcessingTime.proctime");
 
-        for (int q = 0; q < 100; q++) {
+        for (int q = 0; q < numMaxQueries; q++) {
             //use table api for Tumbling window then group by application name and emit result
             Table outputTable = inputTable
                     .window(Tumble.over("1.minutes").on("appProcessingTime").as("w"))
@@ -127,7 +127,7 @@ public class StreamingJob {
 
             outputTable.writeToSink(new CWMetricTableSink(metricTag + "-query-" + q));
 
-            //use one output kinesis stream for test
+            //use only one output kinesis stream for test
             if (q == 0) {
                 //write output to kinesis stream
                 outputTable.writeToSink(new KinesisTableSink(kinesisOutputSink));
