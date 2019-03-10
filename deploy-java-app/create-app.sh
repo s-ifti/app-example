@@ -15,10 +15,15 @@ OUTPUT_STREAM=$6
 BUILT_JAR_S3_BUCKET_ARN=$7
 APP_JAR_FILE_NAME=$8
 PARALLELISM=$9
-PARALLELISM_PERKPU=$((PARALLELISM / 2))
+#PARALLELISM_PERKPU=$((PARALLELISM / 2))
+PARALLELISM_PERKPU=2
 
 if [ "$PARALLELISM_PERKPU" -eq "0" ]; then
    PARALLELISM_PERKPU=1;
+fi
+
+if [ "$PARALLELISM_PERKPU" -gt "4" ]; then
+   PARALLELISM_PERKPU=4;
 fi
 
 aws logs create-log-stream --log-group-name java-app-log-group-$TEST_REGION --log-stream-name $APP_NAME-sample-$TEST_REGION-log --region $TEST_REGION 
