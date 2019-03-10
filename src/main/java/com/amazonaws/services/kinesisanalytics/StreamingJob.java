@@ -114,10 +114,7 @@ public class StreamingJob {
 
         for (int q = 0; q < numMaxQueries; q++) {
             SingleOutputStreamOperator<Tuple2<String, Stats>> output = inputAppModelStream
-                    .map(appEvent -> new Tuple2<>(appEvent.getAppName(), appEvent)
-                    ).returns(TypeInformation.of(new TypeHint<Tuple2<String, AppModel>>() {
-                    }))
-                    .keyBy(t -> t.f0)
+                    .keyBy(t -> t.getAppName())
                     .timeWindow(org.apache.flink.streaming.api.windowing.time.Time.seconds(60))
                     //calc stats for last time window
                     .aggregate(new StatsAggregate(), new MyProcessWindowFunction())
@@ -229,7 +226,7 @@ public class StreamingJob {
      * see https://ci.apache.org/projects/flink/flink-docs-stable/dev/stream/operators/windows.html#incremental-window-aggregation-with-aggregatefunction
      */
     private static class StatsAggregate
-            implements AggregateFunction<Tuple2<String, AppModel>, Stats, Stats> {
+            implements AggregateFunction<AppModel, Stats, Stats> {
         @Override
         public Stats createAccumulator() {
             //start accumulator
@@ -237,12 +234,12 @@ public class StreamingJob {
         }
 
         @Override
-        public Stats add(Tuple2<String, AppModel> value, Stats accumulator) {
+        public Stats add(AppModel value, Stats accumulator) {
             return new Stats(
-                    Math.min(accumulator.getMin(), value.f1.getVersion()),
-                    Math.max(accumulator.getMax(), value.f1.getVersion()),
+                    Math.min(accumulator.getMin(), value.getVersion()),
+                    Math.max(accumulator.getMax(), value.getVersion()),
                     accumulator.getCount() + 1L,
-                    accumulator.getSum() + value.f1.getVersion()
+                    accumulator.getSum() + value.getVersion()
             );
         }
 
