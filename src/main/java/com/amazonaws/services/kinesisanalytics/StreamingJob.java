@@ -8,26 +8,33 @@ package com.amazonaws.services.kinesisanalytics;
 
 import com.amazonaws.services.kinesisanalytics.converters.JsonToAppModelStream;
 import com.amazonaws.services.kinesisanalytics.runtime.KinesisAnalyticsRuntime;
-import com.amazonaws.services.kinesisanalytics.sinks.CWMetricTableSink;
-import com.amazonaws.services.kinesisanalytics.sinks.KinesisTableSink;
-import com.amazonaws.services.kinesisanalytics.sinks.Log4jTableSink;
+import com.amazonaws.services.kinesisanalytics.sinks.CloudwatchMetricSink;
+import com.amazonaws.services.kinesisanalytics.sinks.CloudwatchMetricTupleModel;
 import org.apache.commons.lang.StringUtils;
+import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
+import org.apache.flink.api.common.typeinfo.TypeHint;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
+import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.streaming.connectors.kinesis.FlinkKinesisConsumer;
 import org.apache.flink.streaming.connectors.kinesis.FlinkKinesisProducer;
 import org.apache.flink.streaming.connectors.kinesis.config.AWSConfigConstants;
 import org.apache.flink.streaming.connectors.kinesis.config.ConsumerConfigConstants;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-import org.apache.flink.table.api.Table;
-import org.apache.flink.table.api.TableEnvironment;
-import org.apache.flink.table.api.java.StreamTableEnvironment;
-import org.apache.flink.table.api.java.Tumble;
+import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,36 +108,55 @@ public class StreamingJob {
         // Add kinesis output
         FlinkKinesisProducer<String> kinesisOutputSink = getKinesisOutputSink(outputStreamName, region);
 
-        StreamTableEnvironment tableEnv = TableEnvironment.getTableEnvironment(env);
-        
+
         //convert json string to AppModel stream using a helper class
         DataStream<AppModel> inputAppModelStream = JsonToAppModelStream.convert(inputStream);
 
-        //use table api, i.e. convert input stream to a table, use timestamp field as event time
-        Table inputTable = tableEnv.fromDataStream(inputAppModelStream,
-                "appName,appSessionId,version,appProcessingTime.proctime");
-
         for (int q = 0; q < numMaxQueries; q++) {
-            //use table api for Tumbling window then group by application name and emit result
-            Table outputTable = inputTable
-                    .window(Tumble.over("1.minutes").on("appProcessingTime").as("w"))
-                    .groupBy("w, appName")
-                    .select("appName, w.start, w.end, version.min as minVersion, version.max as maxVersion, version.count as versionCount ");
+            SingleOutputStreamOperator<Tuple2<String, Stats>> output = inputAppModelStream
+                    .map(appEvent -> new Tuple2<>(appEvent.getAppName(), appEvent)
+                    ).returns(TypeInformation.of(new TypeHint<Tuple2<String, AppModel>>() {
+                    }))
+                    .keyBy(t -> t.f0)
+                    .timeWindow(org.apache.flink.streaming.api.windowing.time.Time.seconds(60))
+                    //calc stats for last time window
+                    .aggregate(new StatsAggregate(), new MyProcessWindowFunction())
+                    .name("stats_TimeWindow_q" + q)
+                    .returns(TypeInformation.of(new TypeHint<Tuple2<String, Stats>>() {
+                    }));
 
-            //write input to log4j sink for debugging
-            //do not log input for scale test
-            //inputTable.writeToSink(new Log4jTableSink("Input"));
+                    output.map(outputTuple ->
+                            Arrays.asList(
+                                    new CloudwatchMetricTupleModel(
+                                     /* app name */
+                                            outputTuple.f0,
+                                            "min",
+                                            java.sql.Timestamp.from(Instant.now(Clock.systemUTC())),
+                                            outputTuple.f1.getMin()
+                                    ),
+                                    new CloudwatchMetricTupleModel(
+                                         /* app name */
+                                            outputTuple.f0,
+                                            "max",
+                                            java.sql.Timestamp.from(Instant.now(Clock.systemUTC())),
+                                            outputTuple.f1.getMax()
+                                    ),
+                                    new CloudwatchMetricTupleModel(
+                                            /* app name */
+                                            outputTuple.f0,
+                                            "count",
+                                            java.sql.Timestamp.from(Instant.now(Clock.systemUTC())),
+                                            outputTuple.f1.getCount()
+                                    )
 
-            //do not write output for scale test, rather use CW metric sink
-            //write output to log4j sink for debugging
-            //outputTable.writeToSink(new Log4jTableSink("Output"));
-
-            outputTable.writeToSink(new CWMetricTableSink(metricTag + "-query-" + q));
+                            )
+                    ).returns(TypeInformation.of(new TypeHint<List<CloudwatchMetricTupleModel>>(){}))
+                            .addSink(new CloudwatchMetricSink(metricTag + "-query-" + q));
 
             //use only one output kinesis stream for test
             if (q == 0) {
                 //write output to kinesis stream
-                outputTable.writeToSink(new KinesisTableSink(kinesisOutputSink));
+                output.map(row -> row.f1.toString()).addSink(kinesisOutputSink);
             }
         }
         env.execute();
@@ -192,6 +218,63 @@ public class StreamingJob {
         } catch (IOException var1) {
             LOG.error("Could not retrieve the runtime config properties for {}, exception {}", "AppProperties", var1);
             return null;
+        }
+    }
+
+
+    // Helper Function definitions for direct stream based time window processing
+
+    /**
+     * The Stats accumulator is used to keep a running sum and a count.
+     * see https://ci.apache.org/projects/flink/flink-docs-stable/dev/stream/operators/windows.html#incremental-window-aggregation-with-aggregatefunction
+     */
+    private static class StatsAggregate
+            implements AggregateFunction<Tuple2<String, AppModel>, Stats, Stats> {
+        @Override
+        public Stats createAccumulator() {
+            //start accumulator
+            return new Stats( /* min start */ Double.MAX_VALUE, /* max start */ Double.MIN_VALUE, 0.0, 0.0);
+        }
+
+        @Override
+        public Stats add(Tuple2<String, AppModel> value, Stats accumulator) {
+            return new Stats(
+                    Math.min(accumulator.getMin(), value.f1.getVersion()),
+                    Math.max(accumulator.getMax(), value.f1.getVersion()),
+                    accumulator.getCount() + 1L,
+                    accumulator.getSum() + value.f1.getVersion()
+            );
+        }
+
+        @Override
+        public Stats getResult(Stats accumulator) {
+            return accumulator;
+        }
+
+        @Override
+        public Stats merge(Stats a, Stats b) {
+            return new Stats(
+                    Math.min(a.getMin(), b.getMin()),
+                    Math.max(a.getMax(), b.getMax()),
+                    a.getCount() + b.getCount(),
+                    a.getSum() + b.getSum()
+            );
+        }
+    }
+
+    /**
+     * Proessing window to return stats using a string key.
+     * see https://ci.apache.org/projects/flink/flink-docs-stable/dev/stream/operators/windows.html#incremental-window-aggregation-with-aggregatefunction
+     */
+    private static class MyProcessWindowFunction
+            extends ProcessWindowFunction<Stats, Tuple2<String, Stats>, String, TimeWindow> {
+
+        public void process(String key,
+                            Context context,
+                            Iterable<Stats> aggregates,
+                            Collector<Tuple2<String, Stats>> out) {
+            Stats stats = aggregates.iterator().next();
+            out.collect(new Tuple2<>(key, stats));
         }
     }
 
