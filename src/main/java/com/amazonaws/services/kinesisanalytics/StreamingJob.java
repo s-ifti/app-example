@@ -148,7 +148,7 @@ public class StreamingJob {
 
                             )
                     ).returns(TypeInformation.of(new TypeHint<List<CloudwatchMetricTupleModel>>(){}))
-                            .addSink(new CloudwatchMetricSink(metricTag + "-query-" + q));
+                            .addSink(new CloudwatchMetricSink(metricTag + "-metric" ));
 
             //use only one output kinesis stream for test
             if (q == 0) {
