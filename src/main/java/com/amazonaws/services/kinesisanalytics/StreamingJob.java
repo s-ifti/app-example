@@ -125,7 +125,7 @@ public class StreamingJob {
             //write output to log4j sink for debugging
             //outputTable.writeToSink(new Log4jTableSink("Output"));
 
-            outputTable.writeToSink(new CWMetricTableSink(metricTag + "-query-" + q));
+            outputTable.writeToSink(new CWMetricTableSink(metricTag + "-nokeyby"));
 
             //use only one output kinesis stream for test
             if (q == 0) {

@@ -19,7 +19,7 @@ Parameters:
   SourceBranch:
     Description: Source Code repository branch
     Type: String
-    Default: table-api-json-q25
+    Default: table-api-json-q25-no-keyby
   Parallelism:
     Description: Parallelism to use within flink job (1..8, 60,100,128, or 200)
     Type: String
