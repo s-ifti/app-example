@@ -32,8 +32,8 @@ public class JsonToAppModelStream {
                 .name("inputAppModelStream")
                 //assign timestamp for time window processing
                 .assignTimestampsAndWatermarks(new TimeLagWatermarkGenerator())
-                .name("processingTimestamp")
-                .keyBy("appName");
+                .name("processingTimestamp");
+                //.keyBy("appName");
 
     }
 }
