@@ -78,7 +78,7 @@ public class CustomTableSink implements AppendStreamTableSink<Row> {
         .startNewChain()
         .returns(TypeInformation.of(new TypeHint<List<CloudwatchMetricTupleModel>>(){}))
         .addSink(this.cloudwatchMetricSink)
-        .name("cwMetricOutputAAA");
+        .name("cwMetricOutput");
 
         //write to kinesis
         /*
@@ -88,7 +88,7 @@ public class CustomTableSink implements AppendStreamTableSink<Row> {
           if dataset requires escaping use a csv formatter
          */
         dataStream.map(row -> row.toString()).startNewChain()
-                .addSink(this.kinesisProducerSink).name("kinesisOutputBBB");
+                .addSink(this.kinesisProducerSink).name("kinesisOutput");
     }
 
     @Override
