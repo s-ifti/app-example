@@ -1,10 +1,9 @@
 package com.amazonaws.services.kinesisanalytics.sinks;
 
-import com.google.common.collect.ImmutableList;
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.connectors.kinesis.FlinkKinesisProducer;
 import org.apache.flink.table.sinks.AppendStreamTableSink;
 import org.apache.flink.table.sinks.TableSink;
 import org.apache.flink.types.Row;
@@ -16,35 +15,40 @@ import java.util.Date;
 import java.util.List;
 
 /**
- * a simple CW metric table sink for emitting app aggregated events for min, max, count
- * This class can be used to log any input or output tables to log4j
+ * A custom table output that
+ * will write output to kinesis and will also write few min/max/count metric values to
+ * Cloudwatch
  *
  */
-public class CWMetricTableSink implements AppendStreamTableSink<Row> {
+public class CustomTableSink implements AppendStreamTableSink<Row> {
     private String[] fieldNames;
     private TypeInformation[] fieldTypes;
-    private String metricTag;
+    private FlinkKinesisProducer<String> kinesisProducerSink;
     private CloudwatchMetricSink cloudwatchMetricSink;
 
 
-    public CWMetricTableSink(String metricTag) {
-        this.metricTag = metricTag;
+    public CustomTableSink(FlinkKinesisProducer<String> sink,
+                           CloudwatchMetricSink cloudwatchMetricSink) {
+        this.kinesisProducerSink = sink;
+        this.cloudwatchMetricSink = cloudwatchMetricSink;
     }
 
-    private CWMetricTableSink(String metricTag, String[] fieldNames, TypeInformation<?>[] fieldTypes) {
-        this.metricTag = metricTag;
+    private CustomTableSink(String[] fieldNames,
+                            TypeInformation<?>[] fieldTypes,
+                            FlinkKinesisProducer<String> sink,
+                            CloudwatchMetricSink cloudwatchMetricSink) {
         this.fieldNames = fieldNames;
         this.fieldTypes = fieldTypes;
-        this.cloudwatchMetricSink = new CloudwatchMetricSink(this.metricTag);
+        this.kinesisProducerSink = sink;
+        this.cloudwatchMetricSink = cloudwatchMetricSink;
 
     }
 
     @Override
     public void emitDataStream(DataStream<Row> dataStream) {
 
-        /* emit metrics to CW
+        //write metrics to CW
 
-         */
         dataStream.map(row ->
                 Arrays.asList(
                         new CloudwatchMetricTupleModel(
@@ -69,13 +73,45 @@ public class CWMetricTableSink implements AppendStreamTableSink<Row> {
                                 Double.parseDouble(row.getField(5).toString())
                         )
 
-                )
+            )
         )
-                .startNewChain()
-                .returns(TypeInformation.of(new TypeHint<List<CloudwatchMetricTupleModel>>(){}))
+        .startNewChain()
+        .returns(TypeInformation.of(new TypeHint<List<CloudwatchMetricTupleModel>>(){}))
         .addSink(this.cloudwatchMetricSink)
-        .name("cwMetricOutput");
+        .name("cwMetricOutputAAA");
+
+        //write to kinesis
+        /*
+          convert row to csv string before adding kinesis sink to it
+          note: default Row toString returns a simple csv formatted string
+          the value is not using full csv standard
+          if dataset requires escaping use a csv formatter
+         */
+        dataStream.map(row -> row.toString()).startNewChain()
+                .addSink(this.kinesisProducerSink).name("kinesisOutputBBB");
     }
+
+    @Override
+    public TypeInformation<Row> getOutputType() {
+        return TypeInformation.of(new TypeHint<Row>() {});
+    }
+
+    @Override
+    public TableSink<Row> configure(String[] fieldNames, TypeInformation<?>[] fieldTypes) {
+
+        return new CustomTableSink(fieldNames, fieldTypes, kinesisProducerSink, cloudwatchMetricSink);
+    }
+
+    @Override
+    public String[] getFieldNames() {
+        return this.fieldNames;
+    }
+
+    @Override
+    public TypeInformation<?>[] getFieldTypes() {
+        return this.fieldTypes;
+    }
+
 
 
     static Timestamp fromStringTimestamp(String ts) {
@@ -89,25 +125,4 @@ public class CWMetricTableSink implements AppendStreamTableSink<Row> {
         return timestamp;
     }
 
-
-    @Override
-    public TypeInformation<Row> getOutputType() {
-        return TypeInformation.of(new TypeHint<Row>() {});
-    }
-
-    @Override
-    public TableSink<Row> configure(String[] fieldNames, TypeInformation<?>[] fieldTypes) {
-
-        return new CWMetricTableSink(metricTag, fieldNames, fieldTypes);
-    }
-
-    @Override
-    public String[] getFieldNames() {
-        return this.fieldNames;
-    }
-
-    @Override
-    public TypeInformation<?>[] getFieldTypes() {
-        return this.fieldTypes;
-    }
 }

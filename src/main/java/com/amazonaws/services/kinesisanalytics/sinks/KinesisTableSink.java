@@ -39,7 +39,8 @@ public class KinesisTableSink implements AppendStreamTableSink<Row> {
           the value is not using full csv standard
           if dataset requires escaping use a csv formatter
          */
-        dataStream.map(row -> row.toString()).addSink(this.kinesisProducerSink);
+        dataStream.map(row -> row.toString()).startNewChain()
+                .addSink(this.kinesisProducerSink).name("kinesisOutput");
     }
 
     @Override

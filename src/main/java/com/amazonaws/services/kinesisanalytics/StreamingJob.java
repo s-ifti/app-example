@@ -9,10 +9,14 @@ package com.amazonaws.services.kinesisanalytics;
 import com.amazonaws.services.kinesisanalytics.converters.JsonToAppModelStream;
 import com.amazonaws.services.kinesisanalytics.runtime.KinesisAnalyticsRuntime;
 import com.amazonaws.services.kinesisanalytics.sinks.CWMetricTableSink;
+import com.amazonaws.services.kinesisanalytics.sinks.CloudwatchMetricSink;
+import com.amazonaws.services.kinesisanalytics.sinks.CustomTableSink;
 import com.amazonaws.services.kinesisanalytics.sinks.KinesisTableSink;
 import com.amazonaws.services.kinesisanalytics.sinks.Log4jTableSink;
 import org.apache.commons.lang.StringUtils;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.connectors.kinesis.FlinkKinesisConsumer;
@@ -28,6 +32,7 @@ import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.java.StreamTableEnvironment;
 import org.apache.flink.table.api.java.Tumble;
+import org.apache.flink.types.Row;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -110,28 +115,24 @@ public class StreamingJob {
         Table inputTable = tableEnv.fromDataStream(inputAppModelStream,
                 "appName,appSessionId,version,appProcessingTime.proctime");
 
+
+        // register output table/sink
+        // define the output field names and types
+        String[] outputFieldNames = {"appName", "startTS", "endTS", "minVersion", "maxVersion", "versionCount"};
+        TypeInformation[] outputFieldTypes = {Types.STRING, Types.SQL_TIMESTAMP, Types.SQL_TIMESTAMP,
+                Types.INT, Types.INT, Types.LONG};
+
+        CustomTableSink customOutput = new CustomTableSink(kinesisOutputSink, new CloudwatchMetricSink(metricTag + "-merged-sink"));
+        tableEnv.registerTableSink("customOutput", outputFieldNames, outputFieldTypes, customOutput);
+
+
         for (int q = 0; q < numMaxQueries; q++) {
             //use table api for Tumbling window then group by application name and emit result
             Table outputTable = inputTable
                     .window(Tumble.over("1.minutes").on("appProcessingTime").as("w"))
                     .groupBy("w, appName")
                     .select("appName, w.start, w.end, version.min as minVersion, version.max as maxVersion, version.count as versionCount ");
-
-            //write input to log4j sink for debugging
-            //do not log input for scale test
-            //inputTable.writeToSink(new Log4jTableSink("Input"));
-
-            //do not write output for scale test, rather use CW metric sink
-            //write output to log4j sink for debugging
-            //outputTable.writeToSink(new Log4jTableSink("Output"));
-
-            outputTable.writeToSink(new CWMetricTableSink(metricTag + "-nokeyby"));
-
-            //use only one output kinesis stream for test
-            if (q == 0) {
-                //write output to kinesis stream
-                outputTable.writeToSink(new KinesisTableSink(kinesisOutputSink));
-            }
+            outputTable.insertInto("customOutput");
         }
         env.execute();
     }
