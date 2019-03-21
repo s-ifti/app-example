@@ -7,7 +7,7 @@ import org.apache.flink.streaming.api.watermark.Watermark;
 // for generating timestamp and watermark, required for using any time Window processing
 public class TimeLagWatermarkGenerator implements AssignerWithPeriodicWatermarks<AppModel> {
 
-    private final long maxTimeLag = 5000; // 5 seconds
+    private final long maxTimeLag = 60000; // allow 60 seconds lag for performance testing
 
     @Override
     public long extractTimestamp(AppModel app, long previousElementTimestamp) {
