@@ -99,9 +99,11 @@ public class StreamingJob {
         // use processing time for Time windows
         env.setStreamTimeCharacteristic(TimeCharacteristic.ProcessingTime);
 
+        int currentMaxParallelism = env.getParallelism();
+
         // Add kinesis source
         // Notes: input data stream is a json formatted string
-        DataStream<String> inputStream = getInputDataStream(env, inputStreamName, region);
+        DataStream<String> inputStream = getInputDataStream(env, inputStreamName, region, currentMaxParallelism);
 
         // Add kinesis output
         FlinkKinesisProducer<String> kinesisOutputSink = getKinesisOutputSink(outputStreamName, region);
@@ -109,8 +111,7 @@ public class StreamingJob {
         StreamTableEnvironment tableEnv = TableEnvironment.getTableEnvironment(env);
         
         //convert json string to AppModel stream using a helper class
-        DataStream<AppModel> inputAppModelStream = JsonToAppModelStream.convert(inputStream);
-
+        DataStream<AppModel> inputAppModelStream = JsonToAppModelStream.convert(inputStream, currentMaxParallelism);
         //use table api, i.e. convert input stream to a table, use timestamp field as event time
         Table inputTable = tableEnv.fromDataStream(inputAppModelStream,
                 "appName,appSessionId,version,appProcessingTime.proctime");
@@ -155,13 +156,16 @@ public class StreamingJob {
         return kinesis;
     }
 
-    private static DataStream<String> getInputDataStream(StreamExecutionEnvironment env, String inputStreamName, String region) {
+    private static DataStream<String> getInputDataStream(StreamExecutionEnvironment env, String inputStreamName, String region,
+                                                         int currentParallelism) {
         Properties consumerConfig = new Properties();
         consumerConfig.put(ConsumerConfigConstants.AWS_REGION, region);
         consumerConfig.put(ConsumerConfigConstants.STREAM_INITIAL_POSITION, "LATEST");
+        consumerConfig.put(ConsumerConfigConstants.SHARD_GETRECORDS_INTERVAL_MILLIS, "0");
 
         return env.addSource(new FlinkKinesisConsumer<>(
                 inputStreamName, new SimpleStringSchema(), consumerConfig))
+                .setParallelism(currentParallelism)
                 .name("kinesis");
     }
 

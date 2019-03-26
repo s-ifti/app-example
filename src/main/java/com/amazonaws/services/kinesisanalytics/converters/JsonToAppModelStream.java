@@ -25,15 +25,17 @@ public class JsonToAppModelStream {
      * @param inputJsonStream input json stream
      * @return DataStream instance for AppModel
      */
-    public static DataStream<AppModel> convert(DataStream<String> inputJsonStream) {
+    public static DataStream<AppModel> convert(DataStream<String> inputJsonStream, int parallelism) {
         return inputJsonStream.map(json -> gson.fromJson(json, AppModel.class)
                 .withProcessingTime(Timestamp.from(Instant.now(Clock.systemUTC())))
-        ).returns(AppModel.class)
+                )
+                .setParallelism(parallelism)
+                .returns(AppModel.class)
                 .name("inputAppModelStream")
                 //assign timestamp for time window processing
                 .assignTimestampsAndWatermarks(new TimeLagWatermarkGenerator())
+                //.startNewChain()
                 .name("processingTimestamp");
-                //.keyBy("appName");
 
     }
 }
