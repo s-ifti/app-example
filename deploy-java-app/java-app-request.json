@@ -42,7 +42,7 @@
             "metricTag": "#{APP_NAME}",
             "region" : "#{TEST_REGION}",
             "parallelism" : "#{PARALLELISM}",
-            "numQueries": "200"
+            "numQueries": "2"
           }
         }
       ]
